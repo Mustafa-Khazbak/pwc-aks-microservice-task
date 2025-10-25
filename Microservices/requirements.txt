@@ -1,0 +1,6 @@
+Flask==2.2.2
+prometheus-flask-exporter==0.23.2
+prometheus-client==0.20.0
+json-log-formatter==0.5.2
+gunicorn==22.0.0
+Werkzeug==2.2.2

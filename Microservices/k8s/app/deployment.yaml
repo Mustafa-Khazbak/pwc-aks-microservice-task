@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwc-microservice
+  namespace: pwc-microservice
+  labels:
+    app: pwc-microservice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pwc-microservice
+  template:
+    metadata:
+      labels:
+        app: pwc-microservice
+    spec:
+      containers:
+        - name: pwc-microservice
+          image: pwcregistry-hbfzbwfzd5d9d5dw.azurecr.io/pwc-microservice:1.0.0
+          ports:
+            - containerPort: 5000
+          env:
+            - name: FLASK_ENV
+              value: "production"
+            - name: PORT
+              value: "5000"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 5
+            periodSeconds: 10

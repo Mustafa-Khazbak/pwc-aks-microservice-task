@@ -1,0 +1,58 @@
+{
+    "title": "PWC Microservice API Performance",
+    "schemaVersion": 27,
+    "version": 3,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "type": "stat",
+        "title": "Total User Requests",
+        "datasource": "Prometheus",
+        "targets": [
+          { "expr": "sum(user_requests_total)" }
+        ]
+      },
+      {
+        "id": 2,
+        "type": "graph",
+        "title": "User Requests Per Second (RPS)",
+        "datasource": "Prometheus",
+        "lines": true,
+        "targets": [
+          { "expr": "rate(user_requests_total[1m])", "legendFormat": "RPS" }
+        ]
+      },
+      {
+        "id": 3,
+        "type": "graph",
+        "title": "Requests Per Pod",
+        "datasource": "Prometheus",
+        "lines": true,
+        "targets": [
+          { "expr": "sum by (pod) (rate(user_requests_total[1m]))", "legendFormat": "{{pod}}" }
+        ]
+      },
+      {
+        "id": 4,
+        "type": "graph",
+        "title": "Average Product Processing Time (Seconds)",
+        "datasource": "Prometheus",
+        "lines": true,
+        "targets": [
+          { "expr": "rate(product_processing_seconds_sum[1m]) / rate(product_processing_seconds_count[1m])", "legendFormat": "avg latency" }
+        ]
+      },
+      {
+        "id": 5,
+        "type": "graph",
+        "title": "Processing Time by Pod",
+        "datasource": "Prometheus",
+        "lines": true,
+        "targets": [
+          { "expr": "sum(rate(product_processing_seconds_sum[1m])) by (pod) / sum(rate(product_processing_seconds_count[1m])) by (pod)", "legendFormat": "{{pod}}" }
+        ]
+      }
+    ]
+  }
+  

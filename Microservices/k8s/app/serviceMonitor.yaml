@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pwc-microservice-monitor
+  namespace: pwc-microservice
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+    - pwc-microservice
+  selector:
+    matchLabels:
+      app: pwc-microservice
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
