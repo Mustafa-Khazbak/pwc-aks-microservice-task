@@ -461,3 +461,49 @@ kubectl -n monitoring rollout restart deployment kube-prometheus-stack-grafana
 When Grafana is deployed using the **kube-prometheus-stack** Helm chart, cluster-level dashboards are automatically installed for complete infrastructure observability.
 
 ![dashboard3](README_images/dashboard3.png)
+
+---
+---
+
+## Automated Deployment (CI/CD Pipeline)
+
+This project uses **GitHub Actions** to automate the entire build and deployment process to **AKS**.
+
+Whenever new code is pushed to the `main` branch (or triggered manually), a full **CI/CD pipeline** runs automatically.
+
+---
+
+### Configuring GitHub Secrets
+| Secret Name | Description |
+|--------------|-------------|
+| `AZURE_CREDENTIALS` | JSON output from your Service Principal  |
+| `ACR_NAME` |  Azure Container Registry name |
+| `AKS_CLUSTER` |  AKS cluster|
+| `AKS_RESOURCE_GROUP` | Resource group where the AKS cluster is deployed. | 
+
+![CI/CD](README_images/CI-CD.png)
+
+### Pipeline Steps
+
+1. **Checkout Code**  
+   The workflow clones the repository into a GitHub-hosted runner (Ubuntu virtual machine).
+
+2. **Authenticate to Azure**  
+   The workflow logs in using a Service Principal stored securely in GitHub Secrets (`AZURE_CREDENTIALS`).
+
+3. **Build Docker Image**  
+   The runner builds a Docker image from the project’s `Dockerfile` located in the repository root.
+
+4. **Push to Azure Container Registry (ACR)**  
+   The new image is pushed to the ACR registry:  
+   `pwcregistry-hbfzbwfzd5d9d5dw.azurecr.io/pwc-microservice:<commit-id>`
+
+5. **Update Kubernetes Manifest**  
+   The workflow automatically replaces the old image tag in  
+   `k8s/app/deployment.yaml` with the new image version.
+
+6. **Deploy to AKS**  
+   The updated manifests in `k8s/app/` are applied to the AKS cluster in the  
+   `pwc-microservice` namespace:
+   
+

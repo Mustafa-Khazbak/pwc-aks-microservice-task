@@ -1,0 +1,66 @@
+name: Automated AKS Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY_NAME: ${{ secrets.ACR_NAME }}
+  CLUSTER_NAME: ${{ secrets.AKS_CLUSTER }}
+  RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+  IMAGE_NAME: pwc-microservice
+  IMAGE_TAG: ${{ github.sha }}
+  NAMESPACE: pwc-microservice
+
+jobs:
+  automate-deployment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Login to Azure with Service Principal credentials
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Log in to Azure Container Registry
+      - name: Log in to ACR
+        run: az acr login --name $REGISTRY_NAME
+
+      # Build Docker image from app directory
+      - name: Build Docker image
+        run: |
+          docker build -t $REGISTRY_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG .
+
+      # Push image to ACR
+      - name: Push Docker image
+        run: |
+          docker push $REGISTRY_NAME.azurecr.io/$IMAGE_NAME:$IMAGE_TAG
+
+      # Set AKS context
+      - name: Set AKS context
+        uses: azure/aks-set-context@v3
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          cluster-name: ${{ env.CLUSTER_NAME }}
+          resource-group: ${{ env.RESOURCE_GROUP }}
+
+      # Update manifests with new image version
+      - name: Update image in Kubernetes manifest
+        run: |
+          sed -i "s#image: .*#image: ${REGISTRY_NAME}.azurecr.io/${IMAGE_NAME}:${IMAGE_TAG}#g" k8s/app/deployment.yaml
+
+      # Deploy manifests to AKS
+      - name: Deploy to AKS
+        run: |
+          kubectl apply -f k8s/app/ -n $NAMESPACE
+
+      # Verify rollout
+      - name: Verify Deployment Rollout
+        run: |
+          kubectl rollout status deployment/$IMAGE_NAME -n $NAMESPACE
