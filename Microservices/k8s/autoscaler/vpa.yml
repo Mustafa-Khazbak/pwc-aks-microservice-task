@@ -1,0 +1,12 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: pwc-microservice-vpa
+  namespace: pwc-microservice
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: pwc-microservice
+  updatePolicy:
+    updateMode: "Initial"

@@ -1,0 +1,21 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pwc-microservice-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: pwc-microservice.rules
+    interval: 30s
+    rules:
+    - alert: HighUserCount
+      expr: user_requests_total > 10
+      for: 30s
+      labels:
+        severity: warning
+        component: pwc-microservice
+      annotations:
+        summary: "User count exceeded threshold"
+        description: "User requests total is {{ $value }} (threshold: 10)"

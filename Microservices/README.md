@@ -1,9 +1,21 @@
 # PWC Microservice Deployment on AKS
 
-This project deploys a **Python Flask microservice** on **Azure Kubernetes Service (AKS)** using **Azure Portal**. The application features secure ingress via **Nginx Ingress Controller** with TLS termination and integrated monitoring using **Prometheus** , **Grafana** and **AlertManager**.
+TThis project deploys a Python Flask microservice on ***Azure Kubernetes Service (AKS)*** using ***Terraform*** for Infrastructure as Code (IaC) and the ***Azure Portal*** for cluster management. It implements a dual autoscaling strategy using both ***Horizontal Pod Autoscaler (HPA) and Vertical Pod Autoscaler (VPA)*** to ensure optimal performance and resource efficiency.
+
+The application is exposed securely via an NGINX Ingress Controller with TLS termination, and includes a fully integrated monitoring stack using ***Prometheus, Grafana, and Alertmanager*** for observability and alerting.
 
 ---
 
+## Quick Access
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Application** | `https://20.174.112.243` | Flask microservice endpoints |
+| **Grafana** | `https://20.174.112.243/grafana` | Metrics visualization and dashboards |
+| **Prometheus** | `https://20.174.112.243/prometheus` | Metrics collection and queries |
+| **Alertmanager** | `https://20.174.112.243/alertmanager` | Alert routing and management |
+
+---
 ## Architecture
 
 ### High-Level Architecture
@@ -276,6 +288,64 @@ kubectl apply -f service.yaml
 ---
 ---
 
+## Autoscaling Strategy (HPA + VPA)
+
+- ***Fast reaction to load*** → HPA adds pods during spikes
+- ***Long-term efficiency*** → VPA fine-tunes resource requests so pods run optimally
+  
+### HPA Behavior
+
+- **Min Replicas:** 2 (ensures high availability)
+- **Max Replicas:** 5 (prevents runaway scaling)
+- **Scale Up Trigger:** CPU > 70% OR Memory > 75%
+- **Scale Down:** Gradual reduction when usage drops below thresholds
+
+### Apply HPA
+```bash
+kubectl apply -f k8s/hpa.yaml
+```
+
+### VPA Update Mode: `Initial`
+
+The VPA is configured with `updateMode: Initial` to work harmoniously with HPA:
+
+- **Non-disruptive:** Does not automatically restart pods
+- **Recommendation-based:** Continuously monitors and generates recommendations
+- **Manual control:** Resources updated only when you trigger pod recreation
+- **HPA-compatible:** No conflicts with horizontal scaling decisions
+
+### Apply VPA
+```bash
+kubectl apply -f k8s/vpa.yaml
+```
+
+### Check VPA Recommendations
+```bash
+kubectl describe vpa pwc-microservice-vpa -n pwc-microservice
+![vpa](README_images/vpa.png)
+```
+
+### Check HPA Status
+```bash
+kubectl get hpa -n pwc-microservice
+
+kubectl describe hpa pwc-microservice-hpa -n pwc-microservice
+```
+### HPA in action
+
+- Memory utilization: 104% > 75% threshold
+  
+1. **First Scale Event:**
+   - Trigger: Memory resource utilization above target
+   - Action: Scaled to 4 pods
+
+2. **Second Scale Event:**
+   - Trigger: Memory resource utilization still above target
+   - Action: Scaled to 5 pods (maximum reached)
+  
+![hpa](README_images/hpa.png)
+
+
 ## Ingress Configuration (HTTPS/TLS)
 
 ### Overview
@@ -388,7 +458,7 @@ kubectl get svc -n monitoring
 ![Helm-monitoring](README_images/monitoring.png)
 
 ---
-### Prometheus & Grafana Configuration
+### Prometheus & Grafana & Alertmanager Configuration
 - Secure HTTPS UI access
 - Automatic metric scraping via `ServiceMonitor`
 - Cluster + application dashboards in Grafana
@@ -397,6 +467,7 @@ kubectl get svc -n monitoring
 |--------------|--------------------------|----------------|-------------------------------------------|---------------------|
 | Prometheus   | kube-prometheus-stack    | `monitoring`    | HTTPS `/prometheus` via Ingress           | TLS (self-signed)   |
 | Grafana      | kube-prometheus-stack    | `monitoring`    | HTTPS `/grafana` via Ingress              | Default admin login |
+| Alertmanager   | kube-prometheus-stack    | `monitoring`    | HTTPS `/alertmanager` via Ingress           | TLS (self-signed) 
 | Flask App    | Python + `prometheus_client` | `pwc-microservice` | `/metrics` endpoint                      | ServiceMonitor      |
 
 ### Update Prometheus Base Path
@@ -411,6 +482,39 @@ kubectl edit prometheus -n monitoring kube-prometheus-stack-prometheus
 ```bash
 kubectl apply -f prometheus-ingress.yaml
 ```
+---
+
+### Update Prometheus Metrics Path in ServiceMonitor
+```bash
+kubectl edit servicemonitor -n monitoring kube-prometheus-stack-prometheus
+```
+- Change path:/metrics to path: /prometheus/metrics
+
+![metrics1](README_images/metrics1.png)
+
+---
+### Update Alertmanager API URL in Prometheus CR
+
+```bash
+kubectl edit prometheus -n monitoring kube-prometheus-stack-prometheus
+```
+- Change pathPrefix: / to pathPrefix: /alertmanager
+
+![adjust](README_images/adjust.png)
+
+---
+
+
+
+### Update Alertmanager Metrics Path in ServiceMonitor
+
+```bash
+kubectl edit servicemonitor -n monitoring kube-prometheus-stack-alertmanager
+```
+- Change path:/metrics to path: /alertmanager/metrics
+
+![metrics2](README_images/metrics2.png)
+---
 ### Configure Grafana to serve from /grafana
 ```bash
 kubectl -n monitoring edit configmap kube-prometheus-stack-grafana
@@ -428,15 +532,46 @@ kubectl -n monitoring edit configmap kube-prometheus-stack-grafana-datasource
 ```bash
 kubectl -n monitoring rollout restart deployment kube-prometheus-stack-grafana
 ```
+---
+### Update Alertmanager Base Path
+```bash
+kubectl edit alertmanager -n monitoring kube-prometheus-stack-alertmanager
+```
+- externalUrl: "https://<INGRESS_IP>/alertmanager"
+- routePrefix: "/alertmanager"
+  
+![alert-base](README_images/alertbase.png)
+
+```bash
+kubectl apply -f alertmanager-ingress.yaml
+```
+---
 ### Access URLs
 
 **Grafana Dashboard**: `https://20.174.112.243/grafana`  
 ![grafana-ui](README_images/grafana-ui.png)
 **Prometheus UI**: `https://20.174.112.243/prometheus`
 ![prom-ui](README_images/prom-ui.png)
+**Alertmanager UI**: `https://20.174.112.243/alertmanager`
+![alert-ui](README_images/alert-ui.png)
+**Prometheus Target Health**: `https://20.174.112.243/prometheus/targets`
+![prom-target](README_images/prom-target.png)
 
+---
 
+### Alerting System Simulation
 
+- To verify the alert pipeline end-to-end
+- This was done by the use of custom alert rule ***(HighUserCount)*** making repeated calls to the /users endpoint to increase the user_requests_total metric above the configured alert threshold 
+  
+**Alert Displayed in Prometheus**
+![alert-alertmanager-1](README_images/alert1.png)
+
+**Alert Firing in Prometheus**
+![alert-alertmanager-2](README_images/alert2.png)
+
+**Alert Displayed in Alertmanager**
+![alert-alertmanager-3](README_images/alert-alertmanager.png)
 
 
 ### Custom Application Dashboards
