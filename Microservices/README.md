@@ -16,6 +16,20 @@ The application is exposed securely via an NGINX Ingress Controller with TLS ter
 | **Alertmanager** | `https://20.174.112.243/alertmanager` | Alert routing and management |
 
 ---
+### Directory Overview
+
+| Directory | Purpose | Description |
+|-----------|---------|-------------|
+| **`app/`** | Application Code | Flask microservice with routes, logging, and metrics services |
+| **`k8s/app/`** | Kubernetes Deployment | Deployment manifests, service, |
+| **`k8s/autoscaler/`** | Autoscaling |HPA, and VPA configurations|
+| **`k8s/ingress-nginx/`** | HTTPS Ingress | Nginx ingress with TLS termination and routing rules |
+| **`k8s/monitoring/`** | Monitoring Stack | Prometheus, Grafana, and Alertmanager configurations |
+| **`terraform/`** | Infrastructure | Terraform files for provisioning AKS cluster and ACR integration |
+| **`.github/workflows/`** | CI/CD Pipeline | GitHub Actions workflow for automated deployment |
+| **`grafana-dashboards/`** | Grafana Dashboards | JSON dashboard files for Flask application|
+
+---
 ## Architecture
 
 ### High-Level Architecture
